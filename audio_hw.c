@@ -173,6 +173,21 @@ static void release_buffer(struct resampler_buffer_provider *buffer_provider,
 
 /* Helper functions */
 
+static int select_card(int d)
+{
+    int i;
+    char dname[32];
+    for (i = 0; i < 3; ++i) {
+        sprintf(dname, "/dev/snd/pcmC%dD0%c", i, (d == PCM_IN) ? 'c' : 'p');
+        if (!access(dname, R_OK | W_OK)) {
+            ALOGD("found %s %s", (d == PCM_IN) ? "in" : "out", dname);
+            return i;
+        }
+    }
+    ALOGE("no pcm card found!");
+    return -1;
+}
+
 static void select_devices(struct audio_device *adev)
 {
     int headphone_on;
@@ -289,7 +304,11 @@ static int start_output_stream(struct stream_out *out)
         pthread_mutex_unlock(&in->lock);
     }
 
-    out->pcm = pcm_open(PCM_CARD, device, PCM_OUT | PCM_NORESTART, out->pcm_config);
+    ret = select_card(PCM_OUT);
+    if (ret < 0) {
+        return -ENODEV;
+    }
+    out->pcm = pcm_open(ret, device, PCM_OUT | PCM_NORESTART, out->pcm_config);
 
     if (out->pcm && !pcm_is_ready(out->pcm)) {
         ALOGE("pcm_open(out) failed: %s", pcm_get_error(out->pcm));
@@ -357,7 +376,11 @@ static int start_input_stream(struct stream_in *in)
         pthread_mutex_unlock(&out->lock);
     }
 
-    in->pcm = pcm_open(PCM_CARD, device, PCM_IN, in->pcm_config);
+    ret = select_card(PCM_IN);
+    if (ret < 0) {
+        return -ENODEV;
+    }
+    in->pcm = pcm_open(ret, device, PCM_IN, in->pcm_config);
 
     if (in->pcm && !pcm_is_ready(in->pcm)) {
         ALOGE("pcm_open(in) failed: %s", pcm_get_error(in->pcm));
