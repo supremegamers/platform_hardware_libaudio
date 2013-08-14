@@ -51,4 +51,5 @@ PRODUCT_PACKAGES := \
 	alsa_ctl \
 	audio.primary.x86 \
 	audio.a2dp.default \
+	audio.usb.default \
 	audio_policy.default \
