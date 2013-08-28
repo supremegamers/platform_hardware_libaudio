@@ -715,8 +715,10 @@ static ssize_t out_write(struct audio_stream_out *stream, const void* buffer,
             struct timespec time_stamp;
             if (pcm_get_htimestamp(out->pcm,
                                    (unsigned int *)&kernel_frames,
-                                   &time_stamp) < 0)
+                                   &time_stamp) < 0) {
+                kernel_frames = 0; /* assume no space is available */
                 break;
+            }
             kernel_frames = pcm_get_buffer_size(out->pcm) - kernel_frames;
 
             if (kernel_frames > out->cur_write_threshold) {
