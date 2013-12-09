@@ -74,6 +74,11 @@ static void path_free(struct audio_route *ar)
 {
     unsigned int i;
 
+    if (!ar) {
+        ALOGE("%s: invalid audio_route", __FUNCTION__);
+        return;
+    }
+
     for (i = 0; i < ar->num_mixer_paths; i++) {
         if (ar->mixer_path[i].name)
             free(ar->mixer_path[i].name);
@@ -87,6 +92,10 @@ static struct mixer_path *path_get_by_name(struct audio_route *ar,
                                            const char *name)
 {
     unsigned int i;
+    if (!ar) {
+        ALOGE("%s: invalid audio_route", __FUNCTION__);
+        return NULL;
+    }
 
     for (i = 0; i < ar->num_mixer_paths; i++)
         if (strcmp(ar->mixer_path[i].name, name) == 0)
@@ -98,6 +107,11 @@ static struct mixer_path *path_get_by_name(struct audio_route *ar,
 static struct mixer_path *path_create(struct audio_route *ar, const char *name)
 {
     struct mixer_path *new_mixer_path = NULL;
+
+    if (!ar) {
+        ALOGE("%s: invalid audio_route", __FUNCTION__);
+        return NULL;
+    }
 
     if (path_get_by_name(ar, name)) {
         ALOGE("Path name '%s' already exists", name);
@@ -204,6 +218,11 @@ static int path_apply(struct audio_route *ar, struct mixer_path *path)
 {
     unsigned int i;
     unsigned int j;
+
+    if (!ar) {
+        ALOGE("%s: invalid audio_route", __FUNCTION__);
+        return -1;
+    }
 
     for (i = 0; i < path->length; i++) {
         struct mixer_ctl *ctl = path->setting[i].ctl;
@@ -320,6 +339,11 @@ static int alloc_mixer_state(struct audio_route *ar)
 {
     unsigned int i;
 
+    if (!ar) {
+        ALOGE("%s: invalid audio_route", __FUNCTION__);
+        return -1;
+    }
+
     ar->num_mixer_ctls = mixer_get_num_ctls(ar->mixer);
     ar->mixer_state = malloc(ar->num_mixer_ctls * sizeof(struct mixer_state));
     if (!ar->mixer_state)
@@ -337,6 +361,10 @@ static int alloc_mixer_state(struct audio_route *ar)
 
 static void free_mixer_state(struct audio_route *ar)
 {
+    if (!ar) {
+        ALOGE("%s: invalid audio_route", __FUNCTION__);
+        return;
+    }
     free(ar->mixer_state);
     ar->mixer_state = NULL;
 }
@@ -345,6 +373,11 @@ void update_mixer_state(struct audio_route *ar)
 {
     unsigned int i;
     unsigned int j;
+
+    if (!ar) {
+        ALOGE("%s: invalid audio_route", __FUNCTION__);
+        return;
+    }
 
     for (i = 0; i < ar->num_mixer_ctls; i++) {
         /* if the value has changed, update the mixer */
@@ -363,6 +396,11 @@ static void save_mixer_state(struct audio_route *ar)
 {
     unsigned int i;
 
+    if (!ar) {
+        ALOGE("%s: invalid audio_route", __FUNCTION__);
+        return;
+    }
+
     for (i = 0; i < ar->num_mixer_ctls; i++) {
         /* only get value 0, assume multiple ctl values are the same */
         ar->mixer_state[i].reset_value = mixer_ctl_get_value(ar->mixer_state[i].ctl, 0);
@@ -374,6 +412,11 @@ void reset_mixer_state(struct audio_route *ar)
 {
     unsigned int i;
 
+    if (!ar) {
+        ALOGE("%s: invalid audio_route", __FUNCTION__);
+        return;
+    }
+
     /* load all of the saved values */
     for (i = 0; i < ar->num_mixer_ctls; i++)
         ar->mixer_state[i].new_value = ar->mixer_state[i].reset_value;
@@ -384,7 +427,7 @@ void audio_route_apply_path(struct audio_route *ar, const char *name)
     struct mixer_path *path;
 
     if (!ar) {
-        ALOGE("invalid audio_route");
+        ALOGE("%s: invalid audio_route", __FUNCTION__);
         return;
     }
 
@@ -488,6 +531,10 @@ err_calloc:
 
 void audio_route_free(struct audio_route *ar)
 {
+    if (!ar) {
+        ALOGE("%s: invalid audio_route", __FUNCTION__);
+        return;
+    }
     free_mixer_state(ar);
     mixer_close(ar->mixer);
     free(ar);
