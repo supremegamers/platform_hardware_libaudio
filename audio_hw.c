@@ -188,6 +188,19 @@ static int select_card(int d)
     return -1;
 }
 
+struct pcm *my_pcm_open(unsigned int card, unsigned int device, unsigned int flags, struct pcm_config *config)
+{
+    struct pcm *pcm = pcm_open(card, device, flags, config);
+    if (pcm && !pcm_is_ready(pcm)) {
+        ALOGE("my_pcm_open(%d) failed: %s", flags, pcm_get_error(pcm));
+        pcm_close(pcm);
+        ALOGI("my_pcm_open: re-try 44100 on card %d", card);
+        config->rate = 44100;
+        pcm = pcm_open(card, device, flags, config);
+    }
+    return pcm;
+}
+
 static void select_devices(struct audio_device *adev)
 {
     int headphone_on;
@@ -308,7 +321,7 @@ static int start_output_stream(struct stream_out *out)
     if (ret < 0) {
         return -ENODEV;
     }
-    out->pcm = pcm_open(ret, device, PCM_OUT | PCM_NORESTART, out->pcm_config);
+    out->pcm = my_pcm_open(ret, device, PCM_OUT | PCM_NORESTART, out->pcm_config);
 
     if (out->pcm && !pcm_is_ready(out->pcm)) {
         ALOGE("pcm_open(out) failed: %s", pcm_get_error(out->pcm));
@@ -380,7 +393,7 @@ static int start_input_stream(struct stream_in *in)
     if (ret < 0) {
         return -ENODEV;
     }
-    in->pcm = pcm_open(ret, device, PCM_IN, in->pcm_config);
+    in->pcm = my_pcm_open(ret, device, PCM_IN, in->pcm_config);
 
     if (in->pcm && !pcm_is_ready(in->pcm)) {
         ALOGE("pcm_open(in) failed: %s", pcm_get_error(in->pcm));
@@ -729,7 +742,7 @@ static ssize_t out_write(struct audio_stream_out *stream, const void* buffer,
                     break;
                 total_sleep_time_us += sleep_time_us;
                 if (total_sleep_time_us > MAX_WRITE_SLEEP_US) {
-                    ALOGW("out_write() limiting sleep time %d to %d",
+                    ALOGV("out_write() limiting sleep time %d to %d",
                           total_sleep_time_us, MAX_WRITE_SLEEP_US);
                     sleep_time_us = MAX_WRITE_SLEEP_US -
                                         (total_sleep_time_us - sleep_time_us);
@@ -769,6 +782,7 @@ static ssize_t out_write(struct audio_stream_out *stream, const void* buffer,
     if (ret == -EPIPE) {
         /* In case of underrun, don't sleep since we want to catch up asap */
         pthread_mutex_unlock(&out->lock);
+        ALOGW("out_write underrun: %d", ret);
         return ret;
     }
 
@@ -776,6 +790,7 @@ exit:
     pthread_mutex_unlock(&out->lock);
 
     if (ret != 0) {
+        ALOGW("out_write error: %d, sleeping...", ret);
         usleep(bytes * 1000000 / audio_stream_frame_size(&stream->common) /
                out_get_sample_rate(&stream->common));
     }
