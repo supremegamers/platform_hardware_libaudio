@@ -26,13 +26,14 @@
 
 #include <cutils/log.h>
 
+#include <sound/asound.h>
 #include <tinyalsa/asoundlib.h>
 
 #define BUF_SIZE 1024
 #define MIXER_XML_PATH "/system/etc/mixer_paths.xml"
 #define INITIAL_MIXER_PATH_SIZE 8
 
-#define MIXER_CARD 1
+struct snd_pcm_info *select_card(unsigned int device __unused, unsigned int flags);
 
 struct mixer_state {
     struct mixer_ctl *ctl;
@@ -456,7 +457,12 @@ struct audio_route *audio_route_init(void)
     if (!ar)
         goto err_calloc;
 
-    ar->mixer = mixer_open(MIXER_CARD);
+    struct snd_pcm_info *info = select_card(0, PCM_OUT);
+    if (!info) {
+        ALOGW("Unable to find the mixer");
+        goto err_mixer_open;
+    }
+    ar->mixer = mixer_open(info->card);
     if (!ar->mixer) {
         ALOGE("Unable to open the mixer, aborting.");
         goto err_mixer_open;
