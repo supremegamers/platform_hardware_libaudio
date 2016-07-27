@@ -17,7 +17,9 @@
 #define LOG_TAG "audio_hw_primary"
 /*#define LOG_NDEBUG 0*/
 
+#include <dirent.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <pthread.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -32,6 +34,8 @@
 
 #include <system/audio.h>
 
+#include <linux/ioctl.h>
+#include <sound/asound.h>
 #include <tinyalsa/asoundlib.h>
 
 #include <audio_utils/resampler.h>
@@ -173,30 +177,62 @@ static void release_buffer(struct resampler_buffer_provider *buffer_provider,
 
 /* Helper functions */
 
-static int select_card(int d)
+struct snd_pcm_info *select_card(unsigned int device __unused, unsigned int flags)
 {
-    int i;
-    char dname[32];
-    for (i = 0; i < 3; ++i) {
-        sprintf(dname, "/dev/snd/pcmC%dD0%c", i, (d == PCM_IN) ? 'c' : 'p');
-        if (!access(dname, R_OK | W_OK)) {
-            ALOGD("found %s %s", (d == PCM_IN) ? "in" : "out", dname);
-            return i;
+    static struct snd_pcm_info *cached_info[2];
+    int d = !!(flags & PCM_IN);
+    if (!cached_info[d]) {
+        struct dirent **namelist;
+        char path[PATH_MAX] = "/dev/snd/";
+        int n = scandir(path, &namelist, NULL, alphasort);
+        if (n >= 0) {
+            int i, fd;
+            struct snd_pcm_info *info = malloc(sizeof(*info));
+            for (i = 0; i < n; i++) {
+                struct dirent *de = namelist[i];
+                if (!cached_info[d] && !strncmp(de->d_name, "pcmC", 4)) {
+                    strcpy(path + 9, de->d_name);
+                    if ((fd = open(path, O_RDWR)) >= 0) {
+                        if (!ioctl(fd, SNDRV_PCM_IOCTL_INFO, info)) {
+                            if (info->stream == d && /* ignore IntelHDMI */
+                                    !strstr((const char *)info->id, "IntelHDMI")) {
+                                ALOGD("found audio %s at %s\ncard: %d/%d id: %s\nname: %s\nsubname: %s\nstream: %d",
+                                        d ? "in" : "out", path,
+                                        info->card, info->device, info->id,
+                                        info->name, info->subname, info->stream);
+                                cached_info[d] = info;
+                            }
+                        } else {
+                            ALOGV("can't get info of %s", path);
+                        }
+                        close(fd);
+                    }
+                }
+                free(de);
+            }
+            free(namelist);
+            if (!cached_info[d]) {
+                free(info);
+            }
         }
     }
-    ALOGE("no pcm card found!");
-    return -1;
+    return cached_info[d];
 }
 
-struct pcm *my_pcm_open(unsigned int card, unsigned int device, unsigned int flags, struct pcm_config *config)
+struct pcm *my_pcm_open(unsigned int device, unsigned int flags, struct pcm_config *config)
 {
-    struct pcm *pcm = pcm_open(card, device, flags, config);
+    struct snd_pcm_info *info = select_card(device, flags);
+    if (!info) {
+        ALOGE("unable to find a sound card");
+        return NULL;
+    }
+    struct pcm *pcm = pcm_open(info->card, info->device, flags, config);
     if (pcm && !pcm_is_ready(pcm)) {
         ALOGE("my_pcm_open(%d) failed: %s", flags, pcm_get_error(pcm));
         pcm_close(pcm);
-        ALOGI("my_pcm_open: re-try 44100 on card %d", card);
+        ALOGI("my_pcm_open: re-try 44100 on card %d/%d", info->card, info->device);
         config->rate = 44100;
-        pcm = pcm_open(card, device, flags, config);
+        pcm = pcm_open(info->card, info->device, flags, config);
     }
     return pcm;
 }
@@ -317,13 +353,10 @@ static int start_output_stream(struct stream_out *out)
         pthread_mutex_unlock(&in->lock);
     }
 
-    ret = select_card(PCM_OUT);
-    if (ret < 0) {
+    out->pcm = my_pcm_open(device, PCM_OUT | PCM_NORESTART, out->pcm_config);
+    if (!out->pcm) {
         return -ENODEV;
-    }
-    out->pcm = my_pcm_open(ret, device, PCM_OUT | PCM_NORESTART, out->pcm_config);
-
-    if (out->pcm && !pcm_is_ready(out->pcm)) {
+    } else if (!pcm_is_ready(out->pcm)) {
         ALOGE("pcm_open(out) failed: %s", pcm_get_error(out->pcm));
         pcm_close(out->pcm);
         return -ENOMEM;
@@ -389,13 +422,10 @@ static int start_input_stream(struct stream_in *in)
         pthread_mutex_unlock(&out->lock);
     }
 
-    ret = select_card(PCM_IN);
-    if (ret < 0) {
+    in->pcm = my_pcm_open(device, PCM_IN, in->pcm_config);
+    if (!in->pcm) {
         return -ENODEV;
-    }
-    in->pcm = my_pcm_open(ret, device, PCM_IN, in->pcm_config);
-
-    if (in->pcm && !pcm_is_ready(in->pcm)) {
+    } else if (!pcm_is_ready(in->pcm)) {
         ALOGE("pcm_open(in) failed: %s", pcm_get_error(in->pcm));
         pcm_close(in->pcm);
         return -ENOMEM;
@@ -1027,6 +1057,9 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
     struct audio_device *adev = (struct audio_device *)dev;
     struct stream_out *out;
     int ret;
+
+    if (!select_card(0, PCM_OUT))
+        return -ENODEV;
 
     out = (struct stream_out *)calloc(1, sizeof(struct stream_out));
     if (!out)
