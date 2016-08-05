@@ -50,6 +50,7 @@ PRODUCT_PACKAGES := \
 	alsa_aplay \
 	alsa_ctl \
 	audio.primary.x86 \
+	audio.primary.hdmi \
 	audio.a2dp.default \
 	audio.usb.default \
 	audio_policy.default \
