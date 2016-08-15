@@ -179,20 +179,21 @@ static void release_buffer(struct resampler_buffer_provider *buffer_provider,
 
 struct snd_pcm_info *select_card(unsigned int device __unused, unsigned int flags)
 {
-    static struct snd_pcm_info *cached_info[2];
+    static struct snd_pcm_info *cached_info[4];
+    struct snd_pcm_info *info;
     int d = !!(flags & PCM_IN);
-    if (!cached_info[d]) {
+    if (!cached_info[d] && !cached_info[d + 2]) {
         struct dirent **namelist;
         char path[PATH_MAX] = "/dev/snd/";
         int n = scandir(path, &namelist, NULL, alphasort);
         if (n >= 0) {
             int i, fd;
-            struct snd_pcm_info *info = malloc(sizeof(*info));
             for (i = 0; i < n; i++) {
                 struct dirent *de = namelist[i];
-                if (!cached_info[d] && !strncmp(de->d_name, "pcmC", 4)) {
+                if (!strncmp(de->d_name, "pcmC", 4)) {
                     strcpy(path + 9, de->d_name);
                     if ((fd = open(path, O_RDWR)) >= 0) {
+                        info = malloc(sizeof(*info));
                         if (!ioctl(fd, SNDRV_PCM_IOCTL_INFO, info)) {
                             if (info->stream == d && /* ignore IntelHDMI */
                                     !strstr((const char *)info->id, "IntelHDMI")) {
@@ -200,10 +201,17 @@ struct snd_pcm_info *select_card(unsigned int device __unused, unsigned int flag
                                         d ? "in" : "out", path,
                                         info->card, info->device, info->id,
                                         info->name, info->subname, info->stream);
-                                cached_info[d] = info;
+                                int hdmi = (!!strstr((const char *)info->id, "HDMI")) * 2;
+                                if (cached_info[d + hdmi]) {
+                                    ALOGD("ignore %s", de->d_name);
+                                    free(info);
+                                } else {
+                                    cached_info[d + hdmi] = info;
+                                }
                             }
                         } else {
                             ALOGV("can't get info of %s", path);
+                            free(info);
                         }
                         close(fd);
                     }
@@ -211,12 +219,11 @@ struct snd_pcm_info *select_card(unsigned int device __unused, unsigned int flag
                 free(de);
             }
             free(namelist);
-            if (!cached_info[d]) {
-                free(info);
-            }
         }
     }
-    return cached_info[d];
+    info = cached_info[d] ? cached_info[d] : cached_info[d + 2];
+    ALOGI_IF(info, "choose pcmC%dD%d%c", info->card, info->device, d ? 'c' : 'p');
+    return info;
 }
 
 struct pcm *my_pcm_open(unsigned int device, unsigned int flags, struct pcm_config *config)
