@@ -221,7 +221,11 @@ struct snd_pcm_info *select_card(unsigned int device __unused, unsigned int flag
             free(namelist);
         }
     }
-    info = cached_info[d] ? cached_info[d] : cached_info[d + 2];
+    if (property_get_bool("hal.audio.primary.hdmi", false) && cached_info[d + 2]) {
+        info = cached_info[d + 2];
+    } else {
+        info = cached_info[d] ? cached_info[d] : cached_info[d + 2];
+    }
     ALOGI_IF(info, "choose pcmC%dD%d%c", info->card, info->device, d ? 'c' : 'p');
     return info;
 }
