@@ -45,6 +45,7 @@
 #define PCM_CARD 0
 #define PCM_DEVICE 0
 #define PCM_DEVICE_SCO 2
+#define PCM_DEVICE_HDMI 3
 
 #define OUT_PERIOD_SIZE 512
 #define OUT_SHORT_PERIOD_COUNT 2
@@ -177,7 +178,7 @@ static void release_buffer(struct resampler_buffer_provider *buffer_provider,
 
 /* Helper functions */
 
-struct snd_pcm_info *select_card(unsigned int device __unused, unsigned int flags)
+struct snd_pcm_info *select_card(unsigned int device, unsigned int flags)
 {
     static struct snd_pcm_info *cached_info[4];
     struct snd_pcm_info *info;
@@ -221,12 +222,12 @@ struct snd_pcm_info *select_card(unsigned int device __unused, unsigned int flag
             free(namelist);
         }
     }
-    if (property_get_bool("hal.audio.primary.hdmi", false) && cached_info[d + 2]) {
+    if (property_get_bool("hal.audio.primary.hdmi", device == PCM_DEVICE_HDMI) && cached_info[d + 2]) {
         info = cached_info[d + 2];
     } else {
         info = cached_info[d] ? cached_info[d] : cached_info[d + 2];
     }
-    ALOGI_IF(info, "choose pcmC%dD%d%c", info->card, info->device, d ? 'c' : 'p');
+    ALOGI_IF(info, "choose pcmC%dD%d%c for %d", info->card, info->device, d ? 'c' : 'p', device);
     return info;
 }
 
@@ -341,7 +342,7 @@ static int start_output_stream(struct stream_out *out)
         device = PCM_DEVICE_SCO;
         out->pcm_config = &pcm_config_sco;
     } else {
-        device = PCM_DEVICE;
+        device = (adev->out_device & AUDIO_DEVICE_OUT_AUX_DIGITAL) ? PCM_DEVICE_HDMI : PCM_DEVICE;
         out->pcm_config = &pcm_config_out;
         out->buffer_type = OUT_BUFFER_TYPE_UNKNOWN;
     }
