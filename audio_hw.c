@@ -183,6 +183,7 @@ struct snd_pcm_info *select_card(unsigned int device, unsigned int flags)
     static struct snd_pcm_info *cached_info[4];
     struct snd_pcm_info *info;
     int d = !!(flags & PCM_IN);
+    char e = d ? 'c' : 'p';
     if (!cached_info[d] && !cached_info[d + 2]) {
         struct dirent **namelist;
         char path[PATH_MAX] = "/dev/snd/";
@@ -191,7 +192,7 @@ struct snd_pcm_info *select_card(unsigned int device, unsigned int flags)
             int i, fd;
             for (i = 0; i < n; i++) {
                 struct dirent *de = namelist[i];
-                if (!strncmp(de->d_name, "pcmC", 4)) {
+                if (!strncmp(de->d_name, "pcmC", 4) && de->d_name[strlen(de->d_name) - 1] == e) {
                     strcpy(path + 9, de->d_name);
                     if ((fd = open(path, O_RDWR)) >= 0) {
                         info = malloc(sizeof(*info));
