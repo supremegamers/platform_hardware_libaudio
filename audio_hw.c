@@ -187,7 +187,17 @@ struct snd_pcm_info *select_card(unsigned int device, unsigned int flags)
     if (!cached_info[d] && !cached_info[d + 2]) {
         struct dirent **namelist;
         char path[PATH_MAX] = "/dev/snd/";
-        int n = scandir(path, &namelist, NULL, alphasort);
+        char prop[PROPERTY_VALUE_MAX];
+        int n;
+        if (property_get(d ? "hal.audio.in" : "hal.audio.out", prop, NULL)) {
+            ALOGI("using %s from property", prop);
+            namelist = malloc(sizeof(struct dirent *));
+            namelist[0] = calloc(1, sizeof(struct dirent));
+            strncpy(namelist[0]->d_name, prop, sizeof(namelist[0]->d_name) - 1);
+            n = 1;
+        } else {
+            n = scandir(path, &namelist, NULL, alphasort);
+        }
         if (n >= 0) {
             int i, fd;
             for (i = 0; i < n; i++) {
