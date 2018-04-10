@@ -213,7 +213,7 @@ struct snd_pcm_info *select_card(unsigned int device, unsigned int flags)
                                         d ? "in" : "out", path,
                                         info->card, info->device, info->id,
                                         info->name, info->subname, info->stream);
-                                int hdmi = (!!strstr((const char *)info->id, "HDMI")) * 2;
+                                int hdmi = (!!strcasestr((const char *)info->id, "HDMI")) * 2;
                                 if (cached_info[d + hdmi]) {
                                     ALOGD("ignore %s", de->d_name);
                                     free(info);
