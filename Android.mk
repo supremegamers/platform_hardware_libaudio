@@ -26,6 +26,12 @@ LOCAL_SHARED_LIBRARIES := \
 	libaudioutils \
 	libexpat \
 
+LOCAL_CFLAGS += \
+        -Wno-gnu-designator \
+        -Wno-unused-function \
+        -Wno-unused-label \
+        -Wno-unused-variable
+
 LOCAL_SRC_FILES := \
 	audio_hw.c \
 	audio_route.c
