@@ -72,24 +72,6 @@ struct config_parse_state {
 
 /* path functions */
 
-static void path_free(struct audio_route *ar)
-{
-    unsigned int i;
-
-    if (!ar) {
-        ALOGE("%s: invalid audio_route", __FUNCTION__);
-        return;
-    }
-
-    for (i = 0; i < ar->num_mixer_paths; i++) {
-        if (ar->mixer_path[i].name)
-            free(ar->mixer_path[i].name);
-        if (ar->mixer_path[i].setting)
-            free(ar->mixer_path[i].setting);
-    }
-    free(ar->mixer_path);
-}
-
 static struct mixer_path *path_get_by_name(struct audio_route *ar,
                                            const char *name)
 {
@@ -204,16 +186,6 @@ static int path_add_path(struct mixer_path *path, struct mixer_path *sub_path)
             return -1;
 
     return 0;
-}
-
-static void path_print(struct mixer_path *path)
-{
-    unsigned int i;
-
-    ALOGV("Path: %s, length: %d", path->name, path->length);
-    for (i = 0; i < path->length; i++)
-        ALOGV("  %d: %s -> %d", i, mixer_ctl_get_name(path->setting[i].ctl),
-              path->setting[i].value);
 }
 
 static int path_apply(struct audio_route *ar, struct mixer_path *path)
