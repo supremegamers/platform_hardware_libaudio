@@ -49,6 +49,7 @@ PRODUCT_PACKAGES := \
 	alsa_amixer \
 	alsa_aplay \
 	alsa_ctl \
+	alsa_ucm \
 	audio.primary.x86 \
 	audio.primary.hdmi \
 	audio.a2dp.default \
