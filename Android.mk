@@ -41,4 +41,6 @@ LOCAL_C_INCLUDES := \
 	external/tinyalsa/include \
 	$(call include-path-for, audio-utils)
 
+LOCAL_CFLAGS := -Wno-unused-variable
+
 include $(BUILD_SHARED_LIBRARY)

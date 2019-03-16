@@ -554,8 +554,8 @@ static ssize_t read_frames(struct stream_in *in, void *buffer, ssize_t frames)
                     &frames_rd);
         } else {
             struct resampler_buffer buf = {
-                    { raw : NULL, },
-                    frame_count : frames_rd,
+                    { .raw = NULL, },
+                    .frame_count = frames_rd,
             };
             get_next_buffer(&in->buf_provider, &buf);
             if (buf.raw != NULL) {
@@ -1117,7 +1117,6 @@ static int adev_open_output_stream(struct audio_hw_device *dev,
     *stream_out = &out->stream;
     return 0;
 
-err_open:
     free(out);
     *stream_out = NULL;
     return ret;
