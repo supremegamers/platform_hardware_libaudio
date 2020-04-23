@@ -132,6 +132,7 @@ struct stream_out {
     struct audio_device *dev;
 };
 
+#define MAX_PREPROCESSORS 3
 struct stream_in {
     struct audio_stream_in stream;
 
@@ -149,6 +150,12 @@ struct stream_in {
     int read_status;
 
     struct audio_device *dev;
+
+    effect_handle_t preprocessors[MAX_PREPROCESSORS];
+    int num_preprocessors;
+    int16_t *proc_buf;
+    size_t proc_buf_size;
+    size_t proc_frames_in;
 };
 
 static uint32_t out_get_sample_rate(const struct audio_stream *stream);
@@ -319,6 +326,11 @@ static void do_in_standby(struct stream_in *in)
         if (in->buffer) {
             free(in->buffer);
             in->buffer = NULL;
+        }
+        if (in->proc_buf) {
+            free(in->proc_buf);
+            in->proc_buf = NULL;
+            in->proc_buf_size = 0;
         }
         in->standby = true;
     }
@@ -562,6 +574,78 @@ static ssize_t read_frames(struct stream_in *in, void *buffer, ssize_t frames)
 
         frames_wr += frames_rd;
     }
+    return frames_wr;
+}
+
+static ssize_t process_frames(struct stream_in *in, void* buffer, ssize_t frames)
+{
+    ssize_t frames_wr = 0;
+    audio_buffer_t in_buf;
+    audio_buffer_t out_buf;
+    int i;
+
+    while (frames_wr < frames) {
+        /* first reload enough frames at the end of process input buffer */
+        if (in->proc_frames_in < (size_t)frames) {
+            ssize_t frames_rd;
+
+            if (in->proc_buf_size < (size_t)frames) {
+                in->proc_buf_size = (size_t)frames;
+                in->proc_buf = (int16_t *)realloc(in->proc_buf, in->proc_buf_size * sizeof(int16_t));
+                ALOGV("process_frames(): in->proc_buf %p size extended to %zu frames",
+                      in->proc_buf, in->proc_buf_size);
+            }
+            frames_rd = read_frames(in,
+                                    in->proc_buf + in->proc_frames_in,
+                                    frames - in->proc_frames_in);
+            if (frames_rd < 0) {
+                frames_wr = frames_rd;
+                break;
+            }
+
+            in->proc_frames_in += frames_rd;
+        }
+
+
+        /* in_buf.frameCount and out_buf.frameCount indicate respectively
+         * the maximum number of frames to be consumed and produced by process() */
+        in_buf.frameCount = in->proc_frames_in;
+        in_buf.s16 = in->proc_buf;
+        out_buf.frameCount = frames - frames_wr;
+        out_buf.s16 = (int16_t *)buffer + frames_wr;
+
+        /* FIXME: this works because of current pre processing library implementation that
+         * does the actual process only when the last enabled effect process is called.
+         * The generic solution is to have an output buffer for each effect and pass it as
+         * input to the next. */
+        for (i = 0; i < in->num_preprocessors; i++) {
+            (*in->preprocessors[i])->process(in->preprocessors[i], &in_buf, &out_buf);
+        }
+
+        /* process() has updated the number of frames consumed and produced in
+         * in_buf.frameCount and out_buf.frameCount respectively
+         * move remaining frames to the beginning of in->proc_buf_in */
+        in->proc_frames_in -= in_buf.frameCount;
+        if (in->proc_frames_in) {
+            memmove(in->proc_buf,
+                    in->proc_buf + in_buf.frameCount,
+                    in->proc_frames_in * sizeof(int16_t));
+        }
+
+        /* if not enough frames were passed to process(), read more and retry. */
+        if (out_buf.frameCount == 0)
+            continue;
+
+        if ((frames_wr + (ssize_t)out_buf.frameCount) <= frames) {
+            frames_wr += out_buf.frameCount;
+        } else {
+            /* The effect does not comply to the API. In theory, we should never end up here! */
+            ALOGE("preprocessing produced too many frames: %d + %zu  > %d !",
+                  (unsigned int)frames_wr, out_buf.frameCount, (unsigned int)frames);
+            frames_wr = frames;
+        }
+    }
+
     return frames_wr;
 }
 
@@ -999,25 +1083,10 @@ static ssize_t in_read(struct audio_stream_in *stream, void* buffer,
     if (ret < 0)
         goto exit;
 
-    /*if (in->num_preprocessors != 0) {
+    if (in->num_preprocessors != 0) {
         ret = process_frames(in, buffer, frames_rq);
-    } else */if (in->resampler != NULL) {
-        ret = read_frames(in, buffer, frames_rq);
-    } else if (in->pcm_config->channels == 2) {
-        /*
-         * If the PCM is stereo, capture twice as many frames and
-         * discard the right channel.
-         */
-        unsigned int i;
-        int16_t *in_buffer = (int16_t *)buffer;
-
-        ret = pcm_read(in->pcm, in->buffer, bytes * 2);
-
-        /* Discard right channel */
-        for (i = 0; i < frames_rq; i++)
-            in_buffer[i] = in->buffer[i * 2];
     } else {
-        ret = pcm_read(in->pcm, buffer, bytes);
+        ret = read_frames(in, buffer, frames_rq);
     }
 
     if (ret > 0)
@@ -1044,16 +1113,63 @@ static uint32_t in_get_input_frames_lost(struct audio_stream_in *stream __unused
     return 0;
 }
 
-static int in_add_audio_effect(const struct audio_stream *stream __unused,
-                               effect_handle_t effect __unused)
+static int in_add_audio_effect(const struct audio_stream *stream,
+                               effect_handle_t effect)
 {
-    return 0;
+    struct stream_in *in = (struct stream_in *)stream;
+    int status = 0;
+
+    pthread_mutex_lock(&in->dev->lock);
+    pthread_mutex_lock(&in->lock);
+    if (in->num_preprocessors >= MAX_PREPROCESSORS) {
+        status = -ENOSYS;
+        goto exit;
+    }
+
+    in->preprocessors[in->num_preprocessors++] = effect;
+
+exit:
+
+    pthread_mutex_unlock(&in->lock);
+    pthread_mutex_unlock(&in->dev->lock);
+    return status;
 }
 
-static int in_remove_audio_effect(const struct audio_stream *stream __unused,
-                                  effect_handle_t effect __unused)
+static int in_remove_audio_effect(const struct audio_stream *stream,
+                                  effect_handle_t effect)
 {
-    return 0;
+    struct stream_in *in = (struct stream_in *)stream;
+    int status = -EINVAL;
+    int i;
+
+    pthread_mutex_lock(&in->dev->lock);
+    pthread_mutex_lock(&in->lock);
+    if (in->num_preprocessors <= 0) {
+        status = -ENOSYS;
+        goto exit;
+    }
+
+    for (i = 0; i < in->num_preprocessors; i++) {
+        if (status == 0) {
+            in->preprocessors[i - 1] = in->preprocessors[i];
+            continue;
+        }
+        if (in->preprocessors[i] == effect) {
+            in->preprocessors[i] = NULL;
+            status = 0;
+        }
+    }
+
+    if (status != 0)
+        goto exit;
+
+    in->num_preprocessors--;
+
+exit:
+
+    pthread_mutex_unlock(&in->lock);
+    pthread_mutex_unlock(&in->dev->lock);
+    return status;
 }
 
 
