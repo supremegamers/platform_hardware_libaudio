@@ -46,6 +46,8 @@ PRODUCT_COPY_FILES := \
 	$(if $(wildcard $(PRODUCT_DIR)audio_policy.conf),$(PRODUCT_DIR),$(LOCAL_PATH)/)audio_policy.conf:system/etc/audio_policy.conf \
 
 PRODUCT_PACKAGES := \
+    alsa_alsamixer \
+    alsa_loop \
 	alsa_amixer \
 	alsa_aplay \
 	alsa_ctl \
