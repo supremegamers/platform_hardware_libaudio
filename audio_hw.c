@@ -156,6 +156,8 @@ struct stream_in {
     int16_t *proc_buf;
     size_t proc_buf_size;
     size_t proc_frames_in;
+    int16_t *proc_out_buf;
+    size_t proc_out_frames;
 };
 
 static uint32_t out_get_sample_rate(const struct audio_stream *stream);
@@ -335,6 +337,11 @@ static void do_in_standby(struct stream_in *in)
             free(in->proc_buf);
             in->proc_buf = NULL;
             in->proc_buf_size = 0;
+        }
+        if (in->proc_out_buf) {
+            free(in->proc_out_buf);
+            in->proc_out_buf = NULL;
+            in->proc_out_frames = 0;
         }
         in->standby = true;
     }
@@ -588,20 +595,36 @@ static ssize_t process_frames(struct stream_in *in, void* buffer, ssize_t frames
     audio_buffer_t out_buf;
     int i;
 
+    /* PreProcessing library can only operates on 10ms chunks.
+     * FIXME: Sampling rate that are not multiple of 100 should probably be forbidden... */
+    size_t proc_frames_count = in_get_sample_rate(&in->stream.common) / 100;
+    /* Number of required input frames, must be a multiple of proc_frames_count. */
+    size_t frames_rq = (((size_t)frames + (proc_frames_count - 1)) / proc_frames_count) * proc_frames_count;
+
+    /* Use frames from previous run, if any.
+     * NOTE: This should never be more than wanted number of frames. */
+    if (in->proc_out_frames) {
+        memcpy(buffer,
+               in->proc_out_buf,
+               in->proc_out_frames * sizeof(int16_t));
+        frames_wr = in->proc_out_frames;
+        in->proc_out_frames = 0;
+    }
+
     while (frames_wr < frames) {
         /* first reload enough frames at the end of process input buffer */
-        if (in->proc_frames_in < (size_t)frames) {
+        if (in->proc_frames_in < frames_rq) {
             ssize_t frames_rd;
 
-            if (in->proc_buf_size < (size_t)frames) {
-                in->proc_buf_size = (size_t)frames;
+            if (in->proc_buf_size < frames_rq) {
+                in->proc_buf_size = frames_rq;
                 in->proc_buf = (int16_t *)realloc(in->proc_buf, in->proc_buf_size * sizeof(int16_t));
                 ALOGV("process_frames(): in->proc_buf %p size extended to %zu frames",
                       in->proc_buf, in->proc_buf_size);
             }
             frames_rd = read_frames(in,
                                     in->proc_buf + in->proc_frames_in,
-                                    frames - in->proc_frames_in);
+                                    frames_rq - in->proc_frames_in);
             if (frames_rd < 0) {
                 frames_wr = frames_rd;
                 break;
@@ -610,13 +633,17 @@ static ssize_t process_frames(struct stream_in *in, void* buffer, ssize_t frames
             in->proc_frames_in += frames_rd;
         }
 
+        if (!in->proc_out_buf) {
+            in->proc_out_buf = (int16_t*)malloc(proc_frames_count * sizeof(int16_t));
+        }
 
         /* in_buf.frameCount and out_buf.frameCount indicate respectively
-         * the maximum number of frames to be consumed and produced by process() */
-        in_buf.frameCount = in->proc_frames_in;
+         * the maximum number of frames to be consumed and produced by process(),
+         * must be proc_frames_count */
+        in_buf.frameCount = proc_frames_count;
         in_buf.s16 = in->proc_buf;
-        out_buf.frameCount = frames - frames_wr;
-        out_buf.s16 = (int16_t *)buffer + frames_wr;
+        out_buf.frameCount = proc_frames_count;
+        out_buf.s16 = in->proc_out_buf;
 
         /* FIXME: this works because of current pre processing library implementation that
          * does the actual process only when the last enabled effect process is called.
@@ -641,11 +668,18 @@ static ssize_t process_frames(struct stream_in *in, void* buffer, ssize_t frames
             continue;
 
         if ((frames_wr + (ssize_t)out_buf.frameCount) <= frames) {
+            memcpy((int16_t *)buffer + frames_wr,
+                   out_buf.s16,
+                   out_buf.frameCount * sizeof(int16_t));
             frames_wr += out_buf.frameCount;
         } else {
-            /* The effect does not comply to the API. In theory, we should never end up here! */
-            ALOGE("preprocessing produced too many frames: %d + %zu  > %d !",
-                  (unsigned int)frames_wr, out_buf.frameCount, (unsigned int)frames);
+            memcpy((int16_t *)buffer + frames_wr,
+                   out_buf.s16,
+                   (frames - frames_wr) * sizeof(int16_t));
+            in->proc_out_frames = out_buf.frameCount - (frames - frames_wr);
+            memmove(in->proc_out_buf,
+                    in->proc_out_buf + (frames - frames_wr),
+                    in->proc_out_frames * sizeof(int16_t));
             frames_wr = frames;
         }
     }
