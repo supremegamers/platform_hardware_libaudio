@@ -45,6 +45,17 @@ copy_init := \
 	info \
 	test
 
+LOCAL_ALSA_UCM_DIR := external/alsa-ucm-conf
+
+excluded_ucm := \
+	codecs/qcom-lpass/% \
+	OMAP/% \
+	Qualcomm/% \
+	README.md \
+	Rockchip/% \
+	Samsung/% \
+	Tegra/% \
+
 PRODUCT_COPY_FILES := \
 	$(foreach f,$(copy_conf),$(LOCAL_ALSA_CONF_DIR)/$(f):$(TARGET_ALSA_CONF_DIR)/$(f)) \
 	$(foreach f,$(copy_init),$(LOCAL_ALSA_INIT_DIR)/$(f):$(TARGET_ALSA_CONF_DIR)/init/$(f)) \
@@ -55,7 +66,9 @@ PRODUCT_COPY_FILES := \
 	frameworks/av/services/audiopolicy/config/default_volume_tables.xml:$(TARGET_COPY_OUT_VENDOR)/etc/default_volume_tables.xml \
 	frameworks/av/services/audiopolicy/config/r_submix_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/r_submix_audio_policy_configuration.xml \
 	frameworks/av/services/audiopolicy/config/usb_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/usb_audio_policy_configuration.xml \
-	frameworks/av/services/audiopolicy/config/surround_sound_configuration_5_0.xml:$(TARGET_COPY_OUT_VENDOR)/etc/surround_sound_configuration_5_0.xml
+	frameworks/av/services/audiopolicy/config/surround_sound_configuration_5_0.xml:$(TARGET_COPY_OUT_VENDOR)/etc/surround_sound_configuration_5_0.xml \
+	$(foreach f,$(filter-out $(addprefix ucm2/,$(excluded_ucm)),$(shell cd $(LOCAL_ALSA_UCM_DIR) && find ucm2 -type f)),$(LOCAL_ALSA_UCM_DIR)/$(f):$(TARGET_ALSA_CONF_DIR)/$(f)) \
+
 
 PRODUCT_PACKAGES := \
 	alsa_alsamixer \
