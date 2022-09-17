@@ -71,7 +71,7 @@ PRODUCT_COPY_FILES := \
 
 
 PRODUCT_PACKAGES := \
-	alsa_alsamixer \
+	alsa_mixer \
 	alsa_amixer \
 	alsa_aplay \
 	alsa_ctl \
