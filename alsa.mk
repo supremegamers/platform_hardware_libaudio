@@ -48,16 +48,19 @@ copy_init := \
 PRODUCT_COPY_FILES := \
 	$(foreach f,$(copy_conf),$(LOCAL_ALSA_CONF_DIR)/$(f):$(TARGET_ALSA_CONF_DIR)/$(f)) \
 	$(foreach f,$(copy_init),$(LOCAL_ALSA_INIT_DIR)/$(f):$(TARGET_ALSA_CONF_DIR)/init/$(f)) \
-	$(LOCAL_PATH)/primary_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/primary_audio_policy_configuration.xml \
-	$(LOCAL_PATH)/audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_configuration.xml \
-	frameworks/av/services/audiopolicy/config/a2dp_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/a2dp_audio_policy_configuration.xml \
-	frameworks/av/services/audiopolicy/config/a2dp_in_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/a2dp_in_audio_policy_configuration.xml \
-	frameworks/av/services/audiopolicy/config/bluetooth_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/bluetooth_audio_policy_configuration.xml \
-	frameworks/av/services/audiopolicy/config/audio_policy_volumes.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_volumes.xml \
-	frameworks/av/services/audiopolicy/config/default_volume_tables.xml:$(TARGET_COPY_OUT_VENDOR)/etc/default_volume_tables.xml \
-	frameworks/av/services/audiopolicy/config/r_submix_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/r_submix_audio_policy_configuration.xml \
-	frameworks/av/services/audiopolicy/config/usb_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/usb_audio_policy_configuration.xml \
-	frameworks/av/services/audiopolicy/config/surround_sound_configuration_5_0.xml:$(TARGET_COPY_OUT_VENDOR)/etc/surround_sound_configuration_5_0.xml \
+    $(LOCAL_PATH)/policy/audio_policy_criteria.conf:system/etc/audio_policy_criteria.conf \
+    $(LOCAL_PATH)/policy/audio_policy_configuration.xml:system/etc/audio_policy_configuration.xml \
+    $(LOCAL_PATH)/policy/a2dp_audio_policy_configuration.xml:system/etc/a2dp_audio_policy_configuration.xml \
+    $(LOCAL_PATH)/policy/r_submix_audio_policy_configuration.xml:system/etc/r_submix_audio_policy_configuration.xml \
+    $(LOCAL_PATH)/policy/usb_audio_policy_configuration.xml:system/etc/usb_audio_policy_configuration.xml \
+    $(LOCAL_PATH)/policy/hdmi_audio_policy_configuration.xml:system/etc/hdmi_audio_policy_configuration.xml \
+    $(LOCAL_PATH)/policy/bluetooth_audio_policy_configuration_7_0.xml:system/etc/bluetooth_audio_policy_configuration_7_0.xml \
+    $(LOCAL_PATH)/policy/a2dp_in_audio_policy_configuration_7_0.xml:system/etc/a2dp_in_audio_policy_configuration_7_0.xml \
+    $(LOCAL_PATH)/policy/audio_policy_volumes.xml:system/etc/audio_policy_volumes.xml \
+    $(LOCAL_PATH)/policy/default_volume_tables.xml:system/etc/default_volume_tables.xml \
+    $(LOCAL_PATH)/effect/audio_effects.xml:system/etc/audio_effects.xml \
+    $(LOCAL_PATH)/mixer_paths_0.xml:$(TARGET_COPY_OUT_VENDOR)/etc/mixer_paths_0.xml \
+    $(LOCAL_PATH)/mixer_paths_usb.xml:$(TARGET_COPY_OUT_VENDOR)/etc/mixer_paths_usb.xml
 
 PRODUCT_PACKAGES := \
 	alsa_mixer \
@@ -67,8 +70,10 @@ PRODUCT_PACKAGES := \
 	alsa_ucm \
 	alsa_iecset \
 	audio.primary.x86 \
-	audio.primary.hdmi \
+	audio.primary.x86_old \
+	audio.hdmi.x86 \
 	audio.bluetooth.default \
+	audio.usb.x86 \
 	audio.usb.default \
 	audio_policy.default \
 	audio.r_submix.default \
