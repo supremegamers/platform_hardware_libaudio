@@ -19,6 +19,7 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := audio.primary.x86
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_RELATIVE_PATH := hw
+LOCAL_PROPRIETARY_MODULE := true
 LOCAL_SHARED_LIBRARIES := \
 	liblog \
 	libcutils \
@@ -34,6 +35,8 @@ LOCAL_C_INCLUDES := \
 	external/expat/lib \
 	external/tinyalsa/include \
 	$(call include-path-for, audio-utils)
+
+LOCAL_HEADER_LIBRARIES := libhardware_headers
 
 LOCAL_CFLAGS := -Wno-unused-variable
 
