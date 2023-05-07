@@ -70,5 +70,4 @@ PRODUCT_PACKAGES := \
 	audio.primary.hdmi \
 	audio.bluetooth.default \
 	audio.usb.default \
-	audio_policy.default \
 	audio.r_submix.default \
