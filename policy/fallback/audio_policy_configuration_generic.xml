@@ -14,25 +14,15 @@
      limitations under the License.
 -->
 
-<audioPolicyConfiguration version="1.0" xmlns:xi="http://www.w3.org/2001/XInclude">
+<audioPolicyConfiguration version="7.0" xmlns:xi="http://www.w3.org/2001/XInclude">
     <!-- version section contains a “version” tag in the form “major.minor” e.g version=”1.0” -->
 
     <!-- Global configuration Decalaration -->
     <globalConfiguration speaker_drc_enabled="false"/>
 
     <modules>
-
         <!-- Primary Audio HAL -->
         <xi:include href="primary_audio_policy_configuration.xml"/>
-
-        <!-- A2dp Input Audio HAL -->
-        <xi:include href="a2dp_in_audio_policy_configuration_7_0.xml"/>
-
-        <!-- Bluetooth Audio HAL -->
-        <xi:include href="bluetooth_audio_policy_configuration_7_0.xml"/>
-
-        <!-- Usb Audio HAL -->
-        <xi:include href="usb_audio_policy_configuration.xml"/>
 
         <!-- Remote Submix Audio HAL -->
         <xi:include href="r_submix_audio_policy_configuration.xml"/>
@@ -50,11 +40,5 @@
     <xi:include href="default_volume_tables.xml"/>
 
     <!-- End of Volume section -->
-
-    <!-- Surround Sound configuration -->
-
-    <xi:include href="surround_sound_configuration_5_0.xml"/>
-
-    <!-- End of Surround Sound configuration -->
 
 </audioPolicyConfiguration>
