@@ -70,8 +70,8 @@ PRODUCT_PACKAGES := \
 	alsa_ucm \
 	alsa_iecset \
 	audio.primary.x86 \
+	audio.primary.x86_celadon \
 	audio.hdmi.x86 \
 	audio.bluetooth.default \
-	audio.usb.x86 \
 	audio.usb.default \
 	audio.r_submix.default \
