@@ -63,7 +63,6 @@ PRODUCT_COPY_FILES := \
     $(LOCAL_PATH)/mixer_paths_usb.xml:$(TARGET_COPY_OUT_VENDOR)/etc/mixer_paths_usb.xml
 
 PRODUCT_PACKAGES := \
-	alsa_mixer \
 	alsa_amixer \
 	alsa_aplay \
 	alsa_ctl \
